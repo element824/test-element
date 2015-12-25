@@ -8,7 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <link rel="import" href="../polymer/polymer.html">
-
+<link rel="import" href="../iron-flex-layout/classes/iron-flex-layout.html">
+<link rel="import" href="../paper-material/paper-material.html">
 <!--
 An element providing a solution to no problem in particular.
 
@@ -20,28 +21,65 @@ Example:
 -->
 <dom-module id="test-element">
 
-  <style>
-    :host {
-      display: block;
-      box-sizing: border-box;
-    }
-
-    .author img {
-      float: left;
-      margin-right: 5px;
-      max-height: 100px;
-      max-width: 100px;
-    }
-  </style>
-
   <template>
-    <h1>&lt;test-element&gt;</h1>
-    <content></content>
-    <p class="author">
-      <img src="{{author.image}}">
-      Cheers,<br/>
-      <span class="name">{{author.name}}</span>
-    </p>
+
+    <style>
+      :host {
+        display: block;
+        box-sizing: border-box;
+        min-height: 50px;
+      }
+
+      .row {
+        position: relative;
+        padding: 16px 16px 16px 22px;
+      }
+
+      paper-checkbox {
+        /* Checkbox has 8px of extra space on top so have to tweak it to center */
+        margin-top: -4px;
+        margin-right: 20px;
+      }
+
+      paper-checkbox[checked] + .label {
+        color: #9E9E9E;
+        text-decoration: line-through;
+      }
+
+      paper-input {
+        margin-top: -4px;
+        --paper-input-container-input: {
+          font-family: 'Roboto Slab';
+          font-size: 20px;
+          text-overflow: ellipsis;
+        };
+        --paper-input-container-underline: {
+          background: transparent;
+        };
+      }
+
+      .btn-cancel {
+        opacity: 0;
+        /* Same as paper-material shadow */
+        /*https://github.com/PolymerElements/paper-styles/blob/master/shadow.html#L17*/
+        transition: opacity 0.28s;
+        /* Odd hack to fix cropped paper-ripple focus state */
+        /* https://github.com/PolymerElements/paper-icon-button/issues/33 */
+        font-size: 15px;
+      }
+
+      :host:hover .btn-cancel,
+      :host([active]) .btn-cancel {
+        opacity: 1;
+      }
+    </style>
+
+    <paper-material elevation="[[_computeElevation(active)]]"
+                    class="row layout horizontal center">
+
+      <content></content>
+    </paper-material>
+
   </template>
 
 </dom-module>
@@ -54,96 +92,63 @@ Example:
 
     properties: {
 
-      /**
-       * `fancy` indicates that the element should don a monocle and tophat,
-       * while checking its pocket watch.
-       */
-      fancy: Boolean,
+        todo: Object,
 
-      /**
-       * Describes the author of the element, but is really just an excuse to
-       * show off JSDoc annotations.
-       *
-       * @type {{name: string, image: string}}
-       */
-      author: {
-        type: Object,
-        // Use `value` to provides a default value for a property, by setting it
-        // on your element's prototype.
-        //
-        // If you provide a function, as we do here, Polymer will call that
-        // _per element instance_.
-        //
-        // We do that to ensure that each element gets its own copy of the
-        // value, rather than having it shared across all instances (via the
-        // prototype).
-        value: function() {
-          return {
-            name:  'Dimitri Glazkov',
-            image: 'http://addyosmani.com/blog/wp-content/uploads/2013/04/unicorn.jpg',
-          };
+        // Used to show when one of the child elements has focus. Causes
+        // paper-material to elevate
+        active: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        }
+
+      },
+
+      attached: function() {
+        // Delegate focus events with useCapture to figure out if one of our
+        // child elements is being focused or if we're about to blur
+        // All of this fanciness is for the sake of the raised paper effect
+        this.addEventListener('focus', this._activate.bind(this), true);
+        this.addEventListener('blur', this._deactivate.bind(this), true);
+        this.addEventListener('mouseenter', this._activate.bind(this));
+        this.addEventListener('mouseleave', this._deactivate.bind(this));
+      },
+
+      detached: function() {
+        this.removeEventListener('focus', this._activate.bind(this), true);
+        this.removeEventListener('blur', this._deactivate.bind(this), true);
+        this.removeEventListener('mouseenter', this._activate.bind(this));
+        this.removeEventListener('mouseleave', this._deactivate.bind(this));
+      },
+
+      _activate: function() {
+        this.active = true;
+      },
+
+      _deactivate: function() {
+        this.active = false;
+      },
+
+      _computeElevation: function(active) {
+        return active ? 2 : 0;
+      },
+
+      _computeLabelId: function(uid) {
+        return 'todoItemLabel-' + uid;
+      },
+
+      // If enter was pressed, unfocus the text input
+      _checkConfirmation: function(e) {
+        if (e.keyCode === 13) {
+          e.preventDefault();
+          e.target.blur();
         }
       },
 
-    },
+      _onDelete: function() {
+        this.fire('delete-todo', {todo: this.todo});
+      }
 
-    // Element Lifecycle
-
-    ready: function() {
-      // `ready` is called after all elements have been configured, but
-      // propagates bottom-up. This element's children are ready, but parents
-      // are not.
-      //
-      // This is the point where you should make modifications to the DOM (when
-      // necessary), or kick off any processes the element wants to perform.
-    },
-
-    attached: function() {
-      // `attached` fires once the element and its parents have been inserted
-      // into a document.
-      //
-      // This is a good place to perform any work related to your element's
-      // visual state or active behavior (measuring sizes, beginning animations,
-      // loading resources, etc).
-    },
-
-    detached: function() {
-      // The analog to `attached`, `detached` fires when the element has been
-      // removed from a document.
-      //
-      // Use this to clean up anything you did in `attached`.
-    },
-
-    // Element Behavior
-
-    /**
-     * The `test-element-lasers` event is fired whenever `fireLasers` is called.
-     *
-     * @event test-element-lasers
-     * @detail {{sound: String}}
-     */
-
-    /**
-     * Sometimes it's just nice to say hi.
-     *
-     * @param {string} greeting A positive greeting.
-     * @return {string} The full greeting.
-     */
-    sayHello: function(greeting) {
-      var response = greeting || 'Hello World!';
-      return 'test-element says, ' + response;
-    },
-
-    /**
-     * Attempts to destroy this element's enemies with an any beam of light!
-     *
-     * Or, at least, dispatches an event in the vain hope that someone else will
-     * do the zapping.
-     */
-    fireLasers: function() {
-      this.fire('test-element-lasers', {sound: 'Pew pew!'});
-    }
-
-  });
+    });
 
 </script>
